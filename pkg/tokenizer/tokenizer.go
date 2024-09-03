@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func Tokenize(content structs.Content) []string {
+func Tokenize(content structs.Content, stopWords ...string) []string {
 	buf := bytes.Buffer{}
 	buf.WriteString(strings.ToLower(content.String))
 
@@ -39,18 +39,24 @@ func Tokenize(content structs.Content) []string {
 	}
 
 	buf.Reset()
-	tokens := removeStopWords(filteredBuf.String())
+	tokens := removeStopWords(filteredBuf.String(), stopWords...)
 	filteredBuf.Reset()
 
 	return tokens
 }
 
-func removeStopWords(text string) []string {
+func removeStopWords(text string, stopWords ...string) []string {
 	words := strings.Fields(text)
 	filteredWords := make([]string, 0, len(words))
+	customStopWords := make(map[string]interface{})
+
+	for _, stopWord := range stopWords {
+		customStopWords[stopWord] = nil
+	}
 
 	for _, word := range words {
-		if _, found := stopWords[word]; !found {
+		_, isCustomStopWordFound := customStopWords[word]
+		if _, isDefaultStopWordFound := defaultStopWords[word]; !isDefaultStopWordFound && !isCustomStopWordFound {
 			filteredWords = append(filteredWords, word)
 		}
 	}

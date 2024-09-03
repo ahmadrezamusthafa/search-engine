@@ -1,6 +1,6 @@
 package tokenizer
 
-var stopWords = map[string]interface{}{
+var defaultStopWords = map[string]interface{}{
 	"i": nil, "me": nil, "my": nil, "myself": nil, "we": nil, "our": nil, "ours": nil, "ourselves": nil,
 	"you": nil, "your": nil, "yours": nil, "yourself": nil, "yourselves": nil, "he": nil, "him": nil,
 	"his": nil, "himself": nil, "she": nil, "her": nil, "hers": nil, "herself": nil, "it": nil, "its": nil,

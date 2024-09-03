@@ -34,7 +34,7 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokens := tokenizer.Tokenize(doc.Content)
+	tokens := tokenizer.Tokenize(doc.Content, doc.StopWords...)
 	storage.StoreDocument(doc.ID, tokens)
 
 	response := apiresponse.APIResponse{
