@@ -1,10 +1,10 @@
-package indexer
+package handler
 
 import (
 	"encoding/json"
 	apiresponse "github.com/ahmadrezamusthafa/search-engine/common/api-response"
 	"github.com/ahmadrezamusthafa/search-engine/common/util"
-	"github.com/ahmadrezamusthafa/search-engine/internal/storage"
+	"github.com/ahmadrezamusthafa/search-engine/internal/engine"
 	"github.com/ahmadrezamusthafa/search-engine/internal/structs"
 	"github.com/ahmadrezamusthafa/search-engine/pkg/tokenizer"
 	"io"
@@ -35,7 +35,7 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tokens := tokenizer.Tokenize(doc.Content, doc.StopWords...)
-	storage.StoreDocument(doc.ID, tokens)
+	engine.StoreDocument(doc.ID, tokens)
 
 	response := apiresponse.APIResponse{
 		Status:  "success",

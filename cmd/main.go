@@ -3,10 +3,9 @@ package main
 import (
 	"fmt"
 	"github.com/ahmadrezamusthafa/search-engine/config"
+	"github.com/ahmadrezamusthafa/search-engine/internal/server/http/router"
 	"log"
 	"net/http"
-
-	"github.com/ahmadrezamusthafa/search-engine/internal/router"
 )
 
 func main() {

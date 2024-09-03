@@ -1,10 +1,10 @@
-package searcher
+package handler
 
 import (
 	"errors"
 	apiresponse "github.com/ahmadrezamusthafa/search-engine/common/api-response"
 	"github.com/ahmadrezamusthafa/search-engine/common/util"
-	"github.com/ahmadrezamusthafa/search-engine/internal/storage"
+	"github.com/ahmadrezamusthafa/search-engine/internal/engine"
 	"net/http"
 )
 
@@ -26,7 +26,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results := storage.Search(query)
+	results := engine.Search(query)
 	response := apiresponse.APIResponse{
 		Status: "success",
 		Data:   results,
