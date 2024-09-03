@@ -31,7 +31,15 @@ func Tokenize(content structs.Content) []string {
 		}
 	}
 
-	tokens := strings.Fields(buf.String())
+	filteredBuf := bytes.Buffer{}
+	for _, r := range buf.String() {
+		if r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == ' ' {
+			filteredBuf.WriteRune(r)
+		}
+	}
+
+	buf.Reset()
+	tokens := strings.Fields(filteredBuf.String())
 
 	return tokens
 }
