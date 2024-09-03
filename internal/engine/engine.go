@@ -1,8 +1,6 @@
 package engine
 
 import (
-	"encoding/json"
-	"fmt"
 	"sync"
 )
 
@@ -22,11 +20,6 @@ func StoreDocument(docID string, tokens []string) {
 	}
 	index[docID] = tokenFrequency
 	docTokens[docID] = tokens
-
-	b, _ := json.MarshalIndent(index, "", "  ")
-	fmt.Println("Index:", string(b))
-	b, _ = json.MarshalIndent(docTokens, "", "  ")
-	fmt.Println("Tokens:", string(b))
 }
 
 func Search(queries ...string) []string {
