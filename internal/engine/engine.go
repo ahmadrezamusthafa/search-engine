@@ -29,15 +29,29 @@ func StoreDocument(docID string, tokens []string) {
 	fmt.Println("Tokens:", string(b))
 }
 
-func Search(query string) []string {
+func Search(queries ...string) []string {
 	mu.RLock()
 	defer mu.RUnlock()
 
 	results := make([]string, 0)
-	for docID, tokens := range index {
-		if _, found := tokens[query]; found {
+	docMatches := make(map[string]int)
+
+	for _, query := range queries {
+		for docID, tokens := range index {
+			if _, found := tokens[query]; found {
+				if _, ok := docMatches[docID]; !ok {
+					docMatches[docID] = 0
+				}
+				docMatches[docID]++
+			}
+		}
+	}
+
+	for docID, matchCount := range docMatches {
+		if matchCount == len(queries) {
 			results = append(results, docID)
 		}
 	}
+
 	return results
 }

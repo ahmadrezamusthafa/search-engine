@@ -20,13 +20,13 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	query := r.URL.Query().Get("query")
-	if query == "" {
+	queries := r.URL.Query()["query"]
+	if len(queries) == 0 {
 		err = errors.New("query parameter 'query' is required")
 		return
 	}
 
-	results := engine.Search(query)
+	results := engine.Search(queries...)
 	response := apiresponse.APIResponse{
 		Status: "success",
 		Data:   results,
