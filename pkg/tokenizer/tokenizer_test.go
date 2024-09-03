@@ -17,14 +17,14 @@ func TestTokenize(t *testing.T) {
 			content: structs.Content{
 				String: "FT24245L5RRD TRF Dari - 451 - KHOERIYAH APENDI",
 			},
-			want: []string{"ft24245l5rrd", "trf", "dari", "451", "khoeriyah", "apendi"},
+			want: []string{"ft24245l5rrd", "451", "khoeriyah", "apendi"},
 		},
 		{
 			name: "remove unused characters 2",
 			content: structs.Content{
 				String: "Journal no: 946874 TRANSFER DARI DANDUNG CATUR SUGENG PURWADI",
 			},
-			want: []string{"journal", "no", "946874", "transfer", "dari", "dandung", "catur", "sugeng", "purwadi"},
+			want: []string{"946874", "dandung", "catur", "sugeng", "purwadi"},
 		},
 	}
 	for _, tt := range tests {

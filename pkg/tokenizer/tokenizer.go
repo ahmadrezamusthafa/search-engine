@@ -39,7 +39,21 @@ func Tokenize(content structs.Content) []string {
 	}
 
 	buf.Reset()
-	tokens := strings.Fields(filteredBuf.String())
+	tokens := removeStopWords(filteredBuf.String())
+	filteredBuf.Reset()
 
 	return tokens
+}
+
+func removeStopWords(text string) []string {
+	words := strings.Fields(text)
+	filteredWords := make([]string, 0, len(words))
+
+	for _, word := range words {
+		if _, found := stopWords[word]; !found {
+			filteredWords = append(filteredWords, word)
+		}
+	}
+
+	return filteredWords
 }
