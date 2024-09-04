@@ -15,7 +15,7 @@ import (
 type SearchEngine struct {
 	mu           sync.RWMutex
 	db           *badger.DB
-	docTokens    map[string][]string
+	docTokensLen map[string]int
 	termDocCount map[string]int
 	tokenLength  int
 	docCount     int
@@ -25,7 +25,7 @@ type SearchEngine struct {
 
 func NewSearchEngine(config config.BM25Config, db *badger.DB) (*SearchEngine, error) {
 	return &SearchEngine{
-		docTokens:    make(map[string][]string),
+		docTokensLen: make(map[string]int),
 		termDocCount: make(map[string]int),
 		db:           db,
 		k1:           config.K1,
@@ -42,7 +42,7 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string) {
 		tokenFrequency[token]++
 	}
 
-	se.docTokens[docID] = tokens
+	se.docTokensLen[docID] = len(tokens)
 	se.tokenLength += len(tokens)
 	se.docCount++
 
@@ -114,7 +114,7 @@ func (se *SearchEngine) Search(queries ...string) []structs.SearchResult {
 			}
 
 			for docID, tf := range docFreqMap {
-				docLen := len(se.docTokens[docID])
+				docLen := se.docTokensLen[docID]
 				bm25Score := se.calculateBM25(tf, se.termDocCount[query], docLen, avgDocLen, se.k1, se.b)
 				docScores[docID] += bm25Score
 			}
