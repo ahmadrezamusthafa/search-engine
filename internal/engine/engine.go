@@ -1,9 +1,12 @@
 package engine
 
 import (
+	"encoding/json"
+	"errors"
 	"github.com/ahmadrezamusthafa/search-engine/config"
 	"github.com/ahmadrezamusthafa/search-engine/internal/structs"
 	"github.com/dgraph-io/badger/v4"
+	"log"
 	"math"
 	"sort"
 	"sync"
@@ -12,7 +15,6 @@ import (
 type SearchEngine struct {
 	mu           sync.RWMutex
 	db           *badger.DB
-	index        map[string]map[string]int
 	docTokens    map[string][]string
 	termDocCount map[string]int
 	docCount     int
@@ -22,7 +24,6 @@ type SearchEngine struct {
 
 func NewSearchEngine(config config.BM25Config, db *badger.DB) (*SearchEngine, error) {
 	return &SearchEngine{
-		index:        make(map[string]map[string]int),
 		docTokens:    make(map[string][]string),
 		termDocCount: make(map[string]int),
 		db:           db,
@@ -45,10 +46,42 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string) {
 
 	for token, freq := range tokenFrequency {
 		se.termDocCount[token]++
-		if se.index[token] == nil {
-			se.index[token] = make(map[string]int)
+
+		err := se.db.Update(func(txn *badger.Txn) error {
+			item, err := txn.Get([]byte("index:" + token))
+			if err != nil && !errors.Is(err, badger.ErrKeyNotFound) {
+				return err
+			}
+
+			var currentData map[string]int
+			if err == nil {
+				err = item.Value(func(val []byte) error {
+					return json.Unmarshal(val, &currentData)
+				})
+				if err != nil {
+					return err
+				}
+			} else {
+				currentData = make(map[string]int)
+			}
+
+			currentData[docID] = freq
+
+			updatedData, err := json.Marshal(currentData)
+			if err != nil {
+				return err
+			}
+
+			err = txn.Set([]byte("index:"+token), updatedData)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			log.Fatal(err)
 		}
-		se.index[token][docID] = freq
+
 	}
 }
 
@@ -63,12 +96,31 @@ func (se *SearchEngine) Search(queries ...string) []structs.SearchResult {
 	avgDocLen := se.calculateAvgDocLength()
 	docScores := make(map[string]float64)
 	for _, query := range queries {
-		if docFreqMap, found := se.index[query]; found {
+
+		err := se.db.View(func(txn *badger.Txn) error {
+			item, err := txn.Get([]byte("index:" + query))
+			if err != nil {
+				return err
+			}
+
+			var docFreqMap map[string]int
+			err = item.Value(func(val []byte) error {
+				return json.Unmarshal(val, &docFreqMap)
+			})
+			if err != nil {
+				return err
+			}
+
 			for docID, tf := range docFreqMap {
 				docLen := len(se.docTokens[docID])
 				bm25Score := se.calculateBM25(tf, se.termDocCount[query], docLen, avgDocLen, se.k1, se.b)
 				docScores[docID] += bm25Score
 			}
+
+			return nil
+		})
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 

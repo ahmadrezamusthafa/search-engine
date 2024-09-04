@@ -12,7 +12,8 @@ import (
 PERFORMANCE
 BenchmarkSearch-8   	   42193	     26462 ns/op
 BenchmarkSearch-8   	 2919550	       403.5 ns/op
-BenchmarkSearch-8   	 2946054	       390.2 ns/op <CURRENT>
+BenchmarkSearch-8   	 2946054	       390.2 ns/op
+BenchmarkSearch-8   	  523896	      3724 ns/op - optimize memory usage <CURRENT>
 */
 
 func BenchmarkSearch(b *testing.B) {
