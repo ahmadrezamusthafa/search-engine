@@ -3,13 +3,22 @@ package main
 import (
 	"fmt"
 	"github.com/ahmadrezamusthafa/search-engine/config"
+	"github.com/ahmadrezamusthafa/search-engine/internal/engine"
+	"github.com/ahmadrezamusthafa/search-engine/internal/server/http/handler"
 	"github.com/ahmadrezamusthafa/search-engine/internal/server/http/router"
 	"log"
 	"net/http"
 )
 
 func main() {
-	r := router.NewRouter()
+	searchEngine, err := engine.NewSearchEngine("./badgerdb")
+	if err != nil {
+		log.Fatalf("Failed to create search engine: %v", err)
+	}
+	defer searchEngine.Close()
+
+	h := handler.NewHandler(searchEngine)
+	r := router.NewRouter(h)
 
 	cfg, err := config.LoadConfig("config.yaml")
 	if err != nil {

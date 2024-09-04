@@ -5,9 +5,9 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func NewRouter() *mux.Router {
+func NewRouter(h *handler.Handler) *mux.Router {
 	r := mux.NewRouter()
-	r.HandleFunc("/index", handler.IndexHandler).Methods("POST")
-	r.HandleFunc("/search", handler.SearchHandler).Methods("GET")
+	r.HandleFunc("/index", h.IndexHandler).Methods("POST")
+	r.HandleFunc("/search", h.SearchHandler).Methods("GET")
 	return r
 }

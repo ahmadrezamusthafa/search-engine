@@ -4,14 +4,13 @@ import (
 	"encoding/json"
 	apiresponse "github.com/ahmadrezamusthafa/search-engine/common/api-response"
 	"github.com/ahmadrezamusthafa/search-engine/common/util"
-	"github.com/ahmadrezamusthafa/search-engine/internal/engine"
 	"github.com/ahmadrezamusthafa/search-engine/internal/structs"
 	"github.com/ahmadrezamusthafa/search-engine/pkg/tokenizer"
 	"io"
 	"net/http"
 )
 
-func IndexHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 	defer func() {
 		if err != nil {
@@ -35,7 +34,7 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tokens := tokenizer.Tokenize(doc.Content, doc.StopWords...)
-	engine.StoreDocument(doc.ID, tokens)
+	h.Engine.StoreDocument(doc.ID, tokens)
 
 	response := apiresponse.APIResponse{
 		Status:  "success",

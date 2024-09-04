@@ -4,11 +4,10 @@ import (
 	"errors"
 	apiresponse "github.com/ahmadrezamusthafa/search-engine/common/api-response"
 	"github.com/ahmadrezamusthafa/search-engine/common/util"
-	"github.com/ahmadrezamusthafa/search-engine/internal/engine"
 	"net/http"
 )
 
-func SearchHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SearchHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 	defer func() {
 		if err != nil {
@@ -26,7 +25,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results := engine.Search(queries...)
+	results := h.Engine.Search(queries...)
 	response := apiresponse.APIResponse{
 		Status: "success",
 		Data:   results,
