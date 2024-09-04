@@ -17,6 +17,7 @@ type SearchEngine struct {
 	db           *badger.DB
 	docTokens    map[string][]string
 	termDocCount map[string]int
+	tokenLength  int
 	docCount     int
 	k1           float64
 	b            float64
@@ -42,6 +43,7 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string) {
 	}
 
 	se.docTokens[docID] = tokens
+	se.tokenLength += len(tokens)
 	se.docCount++
 
 	for token, freq := range tokenFrequency {
@@ -95,8 +97,8 @@ func (se *SearchEngine) Search(queries ...string) []structs.SearchResult {
 
 	avgDocLen := se.calculateAvgDocLength()
 	docScores := make(map[string]float64)
-	for _, query := range queries {
 
+	for _, query := range queries {
 		err := se.db.View(func(txn *badger.Txn) error {
 			item, err := txn.Get([]byte("index:" + query))
 			if err != nil {
@@ -137,14 +139,10 @@ func (se *SearchEngine) Search(queries ...string) []structs.SearchResult {
 }
 
 func (se *SearchEngine) calculateAvgDocLength() int {
-	totalLength := 0
-	for _, tokens := range se.docTokens {
-		totalLength += len(tokens)
-	}
 	if se.docCount == 0 {
 		return 0
 	}
-	return totalLength / se.docCount
+	return se.tokenLength / se.docCount
 }
 
 func (se *SearchEngine) calculateBM25(tf, df, docLen, avgDocLen int, k1, b float64) float64 {
