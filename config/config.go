@@ -9,10 +9,16 @@ import (
 
 type Config struct {
 	Server ServerConfig `yaml:"server"`
+	BM25   BM25Config   `yaml:"bm25"`
 }
 
 type ServerConfig struct {
 	Port string `yaml:"port"`
+}
+
+type BM25Config struct {
+	K1 float64 `yaml:"k1"`
+	B  float64 `yaml:"b"`
 }
 
 func LoadConfig(filename string) (*Config, error) {

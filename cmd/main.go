@@ -11,19 +11,18 @@ import (
 )
 
 func main() {
-	searchEngine, err := engine.NewSearchEngine("./badgerdb")
-	if err != nil {
-		log.Fatalf("Failed to create search engine: %v", err)
-	}
-	defer searchEngine.Close()
-
-	h := handler.NewHandler(searchEngine)
-	r := router.NewRouter(h)
-
 	cfg, err := config.LoadConfig("config.yaml")
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
+
+	searchEngine, err := engine.NewSearchEngine(cfg.BM25)
+	if err != nil {
+		log.Fatalf("Failed to create search engine: %v", err)
+	}
+
+	h := handler.NewHandler(searchEngine)
+	r := router.NewRouter(h)
 
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)
 	log.Printf("Starting server on %s...", addr)

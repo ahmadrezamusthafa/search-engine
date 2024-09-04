@@ -1,33 +1,33 @@
 package engine
 
 import (
-	"encoding/json"
-	"github.com/dgraph-io/badger/v4"
-	"log"
+	"github.com/ahmadrezamusthafa/search-engine/config"
+	"github.com/ahmadrezamusthafa/search-engine/internal/structs"
+	"math"
+	"sort"
 	"sync"
 )
 
 type SearchEngine struct {
-	mu    sync.RWMutex
-	index map[string]map[string]int
-	db    *badger.DB
+	mu           sync.RWMutex
+	index        map[string]map[string]int
+	docTokens    map[string][]string
+	termDocCount map[string]int
+	docCount     int
+
+	// constant for BM25
+	k1 float64
+	b  float64
 }
 
-func NewSearchEngine(storageDir string) (*SearchEngine, error) {
-	opts := badger.DefaultOptions(storageDir).WithLoggingLevel(badger.INFO)
-	db, err := badger.Open(opts)
-	if err != nil {
-		return nil, err
-	}
-
+func NewSearchEngine(config config.BM25Config) (*SearchEngine, error) {
 	return &SearchEngine{
-		index: make(map[string]map[string]int),
-		db:    db,
+		index:        make(map[string]map[string]int),
+		docTokens:    make(map[string][]string),
+		termDocCount: make(map[string]int),
+		k1:           config.K1,
+		b:            config.B,
 	}, nil
-}
-
-func (se *SearchEngine) Close() error {
-	return se.db.Close()
 }
 
 func (se *SearchEngine) StoreDocument(docID string, tokens []string) {
@@ -38,67 +38,64 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string) {
 	for _, token := range tokens {
 		tokenFrequency[token]++
 	}
-	se.index[docID] = nil
 
-	data, err := json.Marshal(tokenFrequency)
-	if err != nil {
-		log.Printf("Failed to serialize document %s: %v", docID, err)
-		return
-	}
+	se.docTokens[docID] = tokens
+	se.docCount++
 
-	err = se.db.Update(func(txn *badger.Txn) error {
-		return txn.Set([]byte(docID), data)
-	})
-	if err != nil {
-		log.Printf("Failed to store document %s in DB: %v", docID, err)
+	for token, freq := range tokenFrequency {
+		se.termDocCount[token]++
+		if se.index[token] == nil {
+			se.index[token] = make(map[string]int)
+		}
+		se.index[token][docID] = freq
 	}
 }
 
-func (se *SearchEngine) Search(queries ...string) []string {
+func (se *SearchEngine) Search(queries ...string) []structs.SearchResult {
 	se.mu.RLock()
 	defer se.mu.RUnlock()
 
-	results := make([]string, 0)
+	if len(queries) == 0 {
+		return nil
+	}
 
-	for docID, _ := range se.index {
-		tokens, err := se.getDocumentTokens(docID)
-		if err != nil {
-			log.Printf("Failed to retrieve document tokens for %s: %v", docID, err)
-			continue
-		}
-
-		matches := true
-		for _, query := range queries {
-			if _, found := tokens[query]; !found {
-				matches = false
-				break
+	avgDocLen := se.calculateAvgDocLength()
+	docScores := make(map[string]float64)
+	for _, query := range queries {
+		if docFreqMap, found := se.index[query]; found {
+			for docID, tf := range docFreqMap {
+				docLen := len(se.docTokens[docID])
+				bm25Score := se.calculateBM25(tf, se.termDocCount[query], docLen, avgDocLen, se.k1, se.b)
+				docScores[docID] += bm25Score
 			}
 		}
-		if matches {
-			results = append(results, docID)
-		}
 	}
+
+	results := make([]structs.SearchResult, 0, len(docScores))
+	for docID, score := range docScores {
+		results = append(results, structs.SearchResult{ID: docID, Score: score})
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Score > results[j].Score
+	})
 
 	return results
 }
 
-func (se *SearchEngine) getDocumentTokens(docID string) (map[string]int, error) {
-	var tokens map[string]int
-	err := se.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get([]byte(docID))
-		if err != nil {
-			return err
-		}
-
-		return item.Value(func(val []byte) error {
-			return json.Unmarshal(val, &tokens)
-		})
-	})
-
-	if err != nil {
-		return nil, err
+func (se *SearchEngine) calculateAvgDocLength() int {
+	totalLength := 0
+	for _, tokens := range se.docTokens {
+		totalLength += len(tokens)
 	}
+	if se.docCount == 0 {
+		return 0
+	}
+	return totalLength / se.docCount
+}
 
-	se.index[docID] = tokens
-	return tokens, nil
+func (se *SearchEngine) calculateBM25(tf, df, docLen, avgDocLen int, k1, b float64) float64 {
+	idf := math.Log((float64(se.docCount)-float64(df)+0.5)/(float64(df)+0.5) + 1)
+	tfWeight := (float64(tf) * (k1 + 1)) / (float64(tf) + k1*(1-b+b*float64(docLen)/float64(avgDocLen)))
+	return idf * tfWeight
 }

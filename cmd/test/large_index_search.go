@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/ahmadrezamusthafa/search-engine/config"
 	"github.com/ahmadrezamusthafa/search-engine/internal/engine"
 	"log"
 	"math/rand"
@@ -39,11 +40,15 @@ func generateLargeIndex(searchEngine *engine.SearchEngine, numDocs int) {
 }
 
 func main() {
-	searchEngine, err := engine.NewSearchEngine("./badgerdb")
+	cfg, err := config.LoadConfig("../../config.yaml")
+	if err != nil {
+		log.Fatalf("Error loading config: %v", err)
+	}
+
+	searchEngine, err := engine.NewSearchEngine(cfg.BM25)
 	if err != nil {
 		log.Fatalf("Failed to create search engine: %v", err)
 	}
-	defer searchEngine.Close()
 
 	rand.Seed(time.Now().UnixNano())
 
