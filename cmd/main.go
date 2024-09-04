@@ -6,6 +6,7 @@ import (
 	"github.com/ahmadrezamusthafa/search-engine/internal/engine"
 	"github.com/ahmadrezamusthafa/search-engine/internal/server/http/handler"
 	"github.com/ahmadrezamusthafa/search-engine/internal/server/http/router"
+	"github.com/dgraph-io/badger/v4"
 	"log"
 	"net/http"
 )
@@ -16,7 +17,14 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	searchEngine, err := engine.NewSearchEngine(cfg.BM25)
+	opts := badger.DefaultOptions("./db").WithLoggingLevel(badger.INFO)
+	db, err := badger.Open(opts)
+	if err != nil {
+		log.Fatalf("Failed to init database: %v", err)
+	}
+	defer db.Close()
+
+	searchEngine, err := engine.NewSearchEngine(cfg.BM25, db)
 	if err != nil {
 		log.Fatalf("Failed to create search engine: %v", err)
 	}

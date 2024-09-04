@@ -3,6 +3,7 @@ package engine
 import (
 	"github.com/ahmadrezamusthafa/search-engine/config"
 	"github.com/ahmadrezamusthafa/search-engine/internal/structs"
+	"github.com/dgraph-io/badger/v4"
 	"math"
 	"sort"
 	"sync"
@@ -10,21 +11,21 @@ import (
 
 type SearchEngine struct {
 	mu           sync.RWMutex
+	db           *badger.DB
 	index        map[string]map[string]int
 	docTokens    map[string][]string
 	termDocCount map[string]int
 	docCount     int
-
-	// constant for BM25
-	k1 float64
-	b  float64
+	k1           float64
+	b            float64
 }
 
-func NewSearchEngine(config config.BM25Config) (*SearchEngine, error) {
+func NewSearchEngine(config config.BM25Config, db *badger.DB) (*SearchEngine, error) {
 	return &SearchEngine{
 		index:        make(map[string]map[string]int),
 		docTokens:    make(map[string][]string),
 		termDocCount: make(map[string]int),
+		db:           db,
 		k1:           config.K1,
 		b:            config.B,
 	}, nil
