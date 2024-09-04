@@ -38,7 +38,7 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string) {
 	for _, token := range tokens {
 		tokenFrequency[token]++
 	}
-	se.index[docID] = tokenFrequency
+	se.index[docID] = nil
 
 	data, err := json.Marshal(tokenFrequency)
 	if err != nil {
@@ -60,8 +60,8 @@ func (se *SearchEngine) Search(queries ...string) []string {
 
 	results := make([]string, 0)
 
-	for docID, tokenMap := range se.index {
-		tokens, err := se.getDocumentTokens(docID, tokenMap)
+	for docID, _ := range se.index {
+		tokens, err := se.getDocumentTokens(docID)
 		if err != nil {
 			log.Printf("Failed to retrieve document tokens for %s: %v", docID, err)
 			continue
@@ -82,11 +82,7 @@ func (se *SearchEngine) Search(queries ...string) []string {
 	return results
 }
 
-func (se *SearchEngine) getDocumentTokens(docID string, tokenMap map[string]int) (map[string]int, error) {
-	if tokenMap != nil {
-		return tokenMap, nil
-	}
-
+func (se *SearchEngine) getDocumentTokens(docID string) (map[string]int, error) {
 	var tokens map[string]int
 	err := se.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(docID))
