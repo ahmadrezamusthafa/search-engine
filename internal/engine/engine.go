@@ -14,24 +14,74 @@ import (
 )
 
 type SearchEngine struct {
-	mu           sync.RWMutex
-	db           *badger.DB
-	docTokensLen map[string]int
-	termDocCount map[string]int
-	tokenLen     int
-	docCount     int
-	k1           float64
-	b            float64
+	mu       sync.RWMutex
+	db       *badger.DB
+	tokenLen int
+	docCount int
+	k1       float64
+	b        float64
 }
 
 func NewSearchEngine(config config.BM25Config, db *badger.DB) (*SearchEngine, error) {
+	tokenLen, docCount := repopulateData(db)
 	return &SearchEngine{
-		docTokensLen: make(map[string]int),
-		termDocCount: make(map[string]int),
-		db:           db,
-		k1:           config.K1,
-		b:            config.B,
+		tokenLen: tokenLen,
+		docCount: docCount,
+		db:       db,
+		k1:       config.K1,
+		b:        config.B,
 	}, nil
+}
+
+func repopulateData(db *badger.DB) (int, int) {
+	var tokenLen, docCount int
+
+	err := db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get([]byte("tokenLen"))
+		if err != nil {
+			return err
+		}
+
+		var tokenLens []int
+		if item != nil {
+			err = item.Value(func(val []byte) error {
+				return json.Unmarshal(val, &tokenLens)
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		if len(tokenLens) > 0 {
+			tokenLen = tokenLens[0]
+		}
+
+		item, err = txn.Get([]byte("docCount"))
+		if err != nil {
+			return err
+		}
+
+		var docCounts []int
+		if item != nil {
+			err = item.Value(func(val []byte) error {
+				return json.Unmarshal(val, &docCounts)
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		if len(docCounts) > 0 {
+			docCount = docCounts[0]
+		}
+
+		return nil
+	})
+	if err != nil {
+		log.Println(err)
+	}
+
+	return tokenLen, docCount
 }
 
 func (se *SearchEngine) StoreDocument(docID string, tokens []string, contents ...structs.Content) {
@@ -43,14 +93,50 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string, contents ..
 		tokenFrequency[token]++
 	}
 
-	se.docTokensLen[docID] = len(tokens)
 	se.tokenLen += len(tokens)
 	se.docCount++
 
 	for token, freq := range tokenFrequency {
-		se.termDocCount[token]++
 
 		err := se.db.Update(func(txn *badger.Txn) error {
+			item, err := txn.Get([]byte("termDocCount:" + token))
+			if err != nil && !errors.Is(err, badger.ErrKeyNotFound) {
+				return err
+			}
+
+			var termDocCounts []int
+			if item != nil {
+				err = item.Value(func(val []byte) error {
+					return json.Unmarshal(val, &termDocCounts)
+				})
+				if err != nil {
+					return err
+				}
+			}
+
+			var termDocCount int
+			if len(termDocCounts) > 0 {
+				termDocCount = termDocCounts[0]
+			}
+
+			termDocCount++
+
+			updatedData, err := json.Marshal([]int{termDocCount})
+			if err != nil {
+				return err
+			}
+			err = txn.Set([]byte("termDocCount:"+token), updatedData)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		})
+		if err != nil {
+			log.Println(err)
+		}
+
+		err = se.db.Update(func(txn *badger.Txn) error {
 			item, err := txn.Get([]byte("index:" + token))
 			if err != nil && !errors.Is(err, badger.ErrKeyNotFound) {
 				return err
@@ -84,7 +170,40 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string, contents ..
 		if err != nil {
 			log.Println(err)
 		}
+	}
 
+	err := se.db.Update(func(txn *badger.Txn) error {
+
+		updatedData, err := json.Marshal([]int{len(tokens)})
+		if err != nil {
+			return err
+		}
+		err = txn.Set([]byte("docTokensLen:"+docID), updatedData)
+		if err != nil {
+			return err
+		}
+
+		updatedData, err = json.Marshal([]int{se.tokenLen})
+		if err != nil {
+			return err
+		}
+		err = txn.Set([]byte("tokenLen"), updatedData)
+		if err != nil {
+			return err
+		}
+
+		updatedData, err = json.Marshal([]int{se.docCount})
+		if err != nil {
+			return err
+		}
+		err = txn.Set([]byte("docCount"), updatedData)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		log.Println(err)
 	}
 
 	if len(contents) > 0 {
@@ -132,8 +251,43 @@ func (se *SearchEngine) Search(queries ...string) []structs.SearchResult {
 			}
 
 			for docID, tf := range docFreqMap {
-				docLen := se.docTokensLen[docID]
-				bm25Score := se.calculateBM25(tf, se.termDocCount[query], docLen, avgDocLen, se.k1, se.b)
+				item, err := txn.Get([]byte("docTokensLen:" + docID))
+				if err != nil {
+					return err
+				}
+
+				var docLens []int
+				err = item.Value(func(val []byte) error {
+					return json.Unmarshal(val, &docLens)
+				})
+				if err != nil {
+					return err
+				}
+
+				var docLen int
+				if len(docLens) > 0 {
+					docLen = docLens[0]
+				}
+
+				item, err = txn.Get([]byte("termDocCount:" + query))
+				if err != nil {
+					return err
+				}
+
+				var termDocCounts []int
+				err = item.Value(func(val []byte) error {
+					return json.Unmarshal(val, &termDocCounts)
+				})
+				if err != nil {
+					return err
+				}
+
+				var termDocCount int
+				if len(termDocCounts) > 0 {
+					termDocCount = termDocCounts[0]
+				}
+
+				bm25Score := se.calculateBM25(tf, termDocCount, docLen, avgDocLen, se.k1, se.b)
 				docScores[docID] += bm25Score
 			}
 
