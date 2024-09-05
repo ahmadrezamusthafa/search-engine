@@ -1,17 +1,15 @@
 package engine
 
 import (
-	"encoding/json"
-	"errors"
 	"github.com/ahmadrezamusthafa/search-engine/common/util"
 	"github.com/ahmadrezamusthafa/search-engine/config"
 	"github.com/ahmadrezamusthafa/search-engine/internal/structs"
 	"github.com/ahmadrezamusthafa/search-engine/pkg/badgerdb"
-	"github.com/dgraph-io/badger/v4"
 	"log"
 	"math"
 	"sort"
 	"sync"
+	"time"
 )
 
 type SearchEngine struct {
@@ -35,53 +33,14 @@ func NewSearchEngine(config config.BM25Config, badgerDB *badgerdb.BadgerDB) (*Se
 }
 
 func repopulateData(badgerDB *badgerdb.BadgerDB) (int, int) {
-	var tokenLen, docCount int
-
-	err := badgerDB.DB.View(func(txn *badger.Txn) error {
-		item, err := txn.Get([]byte("tokenLen"))
-		if err != nil {
-			return err
-		}
-
-		var tokenLens []int
-		if item != nil {
-			err = item.Value(func(val []byte) error {
-				return json.Unmarshal(val, &tokenLens)
-			})
-			if err != nil {
-				return err
-			}
-		}
-
-		if len(tokenLens) > 0 {
-			tokenLen = tokenLens[0]
-		}
-
-		item, err = txn.Get([]byte("docCount"))
-		if err != nil {
-			return err
-		}
-
-		var docCounts []int
-		if item != nil {
-			err = item.Value(func(val []byte) error {
-				return json.Unmarshal(val, &docCounts)
-			})
-			if err != nil {
-				return err
-			}
-		}
-
-		if len(docCounts) > 0 {
-			docCount = docCounts[0]
-		}
-
-		return nil
-	})
+	tokenLen, err := badgerDB.GetInt("tokenLen")
 	if err != nil {
-		log.Println(err)
+		return 0, 0
 	}
-
+	docCount, err := badgerDB.GetInt("docCount")
+	if err != nil {
+		return 0, 0
+	}
 	return tokenLen, docCount
 }
 
@@ -98,127 +57,45 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string, contents ..
 	se.docCount++
 
 	for token, freq := range tokenFrequency {
-
-		err := se.badgerDB.DB.Update(func(txn *badger.Txn) error {
-			item, err := txn.Get([]byte("termDocCount:" + token))
-			if err != nil && !errors.Is(err, badger.ErrKeyNotFound) {
-				return err
-			}
-
-			var termDocCounts []int
-			if item != nil {
-				err = item.Value(func(val []byte) error {
-					return json.Unmarshal(val, &termDocCounts)
-				})
-				if err != nil {
-					return err
-				}
-			}
-
-			var termDocCount int
-			if len(termDocCounts) > 0 {
-				termDocCount = termDocCounts[0]
-			}
-
-			termDocCount++
-
-			updatedData, err := json.Marshal([]int{termDocCount})
-			if err != nil {
-				return err
-			}
-			err = txn.Set([]byte("termDocCount:"+token), updatedData)
-			if err != nil {
-				return err
-			}
-
-			return nil
-		})
+		termDocCount, err := se.badgerDB.GetInt("termDocCount:" + token)
 		if err != nil {
 			log.Println(err)
 		}
-
-		err = se.badgerDB.DB.Update(func(txn *badger.Txn) error {
-			item, err := txn.Get([]byte("index:" + token))
-			if err != nil && !errors.Is(err, badger.ErrKeyNotFound) {
-				return err
-			}
-
-			var currentData map[string]int
-			if err == nil {
-				err = item.Value(func(val []byte) error {
-					return json.Unmarshal(val, &currentData)
-				})
-				if err != nil {
-					return err
-				}
-			} else {
-				currentData = make(map[string]int)
-			}
-
-			currentData[docID] = freq
-
-			updatedData, err := json.Marshal(currentData)
-			if err != nil {
-				return err
-			}
-
-			err = txn.Set([]byte("index:"+token), updatedData)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
+		termDocCount++
+		err = se.badgerDB.SetInt("termDocCount:"+token, termDocCount, 1*time.Hour)
+		if err != nil {
+			log.Println(err)
+		}
+		var currentIndexData map[string]int
+		err = se.badgerDB.GetObject("index:"+token, &currentIndexData)
+		if err != nil {
+			log.Println(err)
+		}
+		if currentIndexData == nil {
+			currentIndexData = make(map[string]int)
+		}
+		currentIndexData[docID] = freq
+		err = se.badgerDB.SetObject("index:"+token, currentIndexData, 1*time.Hour)
 		if err != nil {
 			log.Println(err)
 		}
 	}
 
-	err := se.badgerDB.DB.Update(func(txn *badger.Txn) error {
-
-		updatedData, err := json.Marshal([]int{len(tokens)})
-		if err != nil {
-			return err
-		}
-		err = txn.Set([]byte("docTokensLen:"+docID), updatedData)
-		if err != nil {
-			return err
-		}
-
-		updatedData, err = json.Marshal([]int{se.tokenLen})
-		if err != nil {
-			return err
-		}
-		err = txn.Set([]byte("tokenLen"), updatedData)
-		if err != nil {
-			return err
-		}
-
-		updatedData, err = json.Marshal([]int{se.docCount})
-		if err != nil {
-			return err
-		}
-		err = txn.Set([]byte("docCount"), updatedData)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	err := se.badgerDB.SetInt("docTokensLen:"+docID, len(tokens), 1*time.Hour)
+	if err != nil {
+		log.Println(err)
+	}
+	err = se.badgerDB.SetInt("tokenLen", se.tokenLen, 1*time.Hour)
+	if err != nil {
+		log.Println(err)
+	}
+	err = se.badgerDB.SetInt("docCount", se.docCount, 1*time.Hour)
 	if err != nil {
 		log.Println(err)
 	}
 
 	if len(contents) > 0 {
-		err := se.badgerDB.DB.Update(func(txn *badger.Txn) error {
-			val, err := json.Marshal(contents[0].Object)
-			if err != nil {
-				return err
-			}
-			err = txn.Set([]byte("data:"+docID), val)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
+		err := se.badgerDB.SetObject("data:"+docID, contents[0].Object, 1*time.Hour)
 		if err != nil {
 			log.Println(err)
 		}
@@ -237,65 +114,29 @@ func (se *SearchEngine) Search(queries ...string) []structs.SearchResult {
 	docScores := make(map[string]float64)
 
 	for _, query := range queries {
-		err := se.badgerDB.DB.View(func(txn *badger.Txn) error {
-			item, err := txn.Get([]byte("index:" + query))
-			if err != nil {
-				return err
-			}
-
-			var docFreqMap map[string]int
-			err = item.Value(func(val []byte) error {
-				return json.Unmarshal(val, &docFreqMap)
-			})
-			if err != nil {
-				return err
-			}
-
-			for docID, tf := range docFreqMap {
-				item, err := txn.Get([]byte("docTokensLen:" + docID))
-				if err != nil {
-					return err
-				}
-
-				var docLens []int
-				err = item.Value(func(val []byte) error {
-					return json.Unmarshal(val, &docLens)
-				})
-				if err != nil {
-					return err
-				}
-
-				var docLen int
-				if len(docLens) > 0 {
-					docLen = docLens[0]
-				}
-
-				item, err = txn.Get([]byte("termDocCount:" + query))
-				if err != nil {
-					return err
-				}
-
-				var termDocCounts []int
-				err = item.Value(func(val []byte) error {
-					return json.Unmarshal(val, &termDocCounts)
-				})
-				if err != nil {
-					return err
-				}
-
-				var termDocCount int
-				if len(termDocCounts) > 0 {
-					termDocCount = termDocCounts[0]
-				}
-
-				bm25Score := se.calculateBM25(tf, termDocCount, docLen, avgDocLen, se.k1, se.b)
-				docScores[docID] += bm25Score
-			}
-
-			return nil
-		})
+		var docFreqMap map[string]int
+		err := se.badgerDB.GetObject("index:"+query, &docFreqMap)
 		if err != nil {
-			log.Println(err)
+			return nil
+		}
+
+		if docFreqMap == nil {
+			continue
+		}
+
+		for docID, tf := range docFreqMap {
+			docLen, err := se.badgerDB.GetInt("docTokensLen:" + docID)
+			if err != nil {
+				log.Println(err)
+			}
+
+			termDocCount, err := se.badgerDB.GetInt("termDocCount:" + query)
+			if err != nil {
+				log.Println(err)
+			}
+
+			bm25Score := se.calculateBM25(tf, termDocCount, docLen, avgDocLen, se.k1, se.b)
+			docScores[docID] += bm25Score
 		}
 	}
 
@@ -310,25 +151,14 @@ func (se *SearchEngine) Search(queries ...string) []structs.SearchResult {
 
 	if len(results) > 0 {
 		results = util.GetTopItems(results, 3)
-		err := se.badgerDB.DB.View(func(txn *badger.Txn) error {
-			for i, result := range results {
-				item, err := txn.Get([]byte("data:" + result.ID))
-				if err != nil {
-					return err
-				}
-				var value map[string]interface{}
-				err = item.Value(func(val []byte) error {
-					return json.Unmarshal(val, &value)
-				})
-				if err != nil {
-					return err
-				}
-				results[i].Data = value
+		for i, result := range results {
+			var value map[string]interface{}
+			err := se.badgerDB.GetObject("data:"+result.ID, &value)
+			if err != nil {
+				log.Println(err)
+				continue
 			}
-			return nil
-		})
-		if err != nil {
-			log.Println(err)
+			results[i].Data = value
 		}
 	}
 

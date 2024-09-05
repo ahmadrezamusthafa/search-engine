@@ -3,6 +3,7 @@ package badgerdb
 import (
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/dgraph-io/badger/v4/options"
 	"log"
@@ -30,8 +31,8 @@ func NewBadgerDB(path string) *BadgerDB {
 	}
 }
 
-func (b *BadgerDB) SetInt(db *badger.DB, key string, value int, ttl time.Duration) error {
-	return db.Update(func(txn *badger.Txn) error {
+func (b *BadgerDB) SetInt(key string, value int, ttl time.Duration) error {
+	return b.DB.Update(func(txn *badger.Txn) error {
 		valueBytes := make([]byte, 8)
 		binary.BigEndian.PutUint64(valueBytes, uint64(value))
 
@@ -44,14 +45,16 @@ func (b *BadgerDB) GetInt(key string) (int, error) {
 	var intValue int
 	err := b.DB.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(key))
-		if err != nil {
+		if err != nil && !errors.Is(err, badger.ErrKeyNotFound) {
 			return err
 		}
-		val, err := item.ValueCopy(nil)
-		if err != nil {
-			return err
+		if item != nil {
+			val, err := item.ValueCopy(nil)
+			if err != nil {
+				return err
+			}
+			intValue = int(binary.BigEndian.Uint64(val))
 		}
-		intValue = int(binary.BigEndian.Uint64(val))
 		return nil
 	})
 	return intValue, err
@@ -72,14 +75,17 @@ func (b *BadgerDB) SetObject(key string, value interface{}, ttl time.Duration) e
 func (b *BadgerDB) GetObject(key string, target interface{}) error {
 	return b.DB.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(key))
-		if err != nil {
+		if err != nil && !errors.Is(err, badger.ErrKeyNotFound) {
 			return err
 		}
-		val, err := item.ValueCopy(nil)
-		if err != nil {
-			return err
+		if item != nil {
+			val, err := item.ValueCopy(nil)
+			if err != nil {
+				return err
+			}
+			return json.Unmarshal(val, target)
 		}
-		return json.Unmarshal(val, target)
+		return nil
 	})
 }
 
