@@ -25,10 +25,7 @@ func BenchmarkSearch(b *testing.B) {
 	db := badgerdb.NewBadgerDB("./db")
 	defer db.Close()
 
-	searchEngine, err := engine.NewSearchEngine(cfg.BM25, db)
-	if err != nil {
-		log.Fatalf("Failed to create search engine: %v", err)
-	}
+	searchEngine := engine.NewSearchEngine(cfg.BM25, db)
 
 	searchEngine.StoreDocument("doc1", []string{"abc", "nasbdm", "aksjdhaks", "iuyiuweyri"})
 	searchEngine.StoreDocument("doc2", []string{"bvbv", "nasbdm", "aksjdhaks", "iuyiuweyri"})

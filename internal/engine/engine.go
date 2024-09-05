@@ -21,7 +21,7 @@ type SearchEngine struct {
 	b        float64
 }
 
-func NewSearchEngine(config config.BM25Config, badgerDB *badgerdb.BadgerDB) (*SearchEngine, error) {
+func NewSearchEngine(config config.BM25Config, badgerDB *badgerdb.BadgerDB) *SearchEngine {
 	tokenLen, docCount := repopulateData(badgerDB)
 	return &SearchEngine{
 		tokenLen: tokenLen,
@@ -29,7 +29,7 @@ func NewSearchEngine(config config.BM25Config, badgerDB *badgerdb.BadgerDB) (*Se
 		badgerDB: badgerDB,
 		k1:       config.K1,
 		b:        config.B,
-	}, nil
+	}
 }
 
 func repopulateData(badgerDB *badgerdb.BadgerDB) (int, int) {

@@ -20,10 +20,7 @@ func main() {
 	db := badgerdb.NewBadgerDB("./db")
 	defer db.Close()
 
-	searchEngine, err := engine.NewSearchEngine(cfg.BM25, db)
-	if err != nil {
-		log.Fatalf("Failed to create search engine: %v", err)
-	}
+	searchEngine := engine.NewSearchEngine(cfg.BM25, db)
 
 	h := handler.NewHandler(searchEngine)
 	r := router.NewRouter(h)
