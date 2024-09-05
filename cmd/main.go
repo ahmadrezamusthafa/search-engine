@@ -7,6 +7,7 @@ import (
 	"github.com/ahmadrezamusthafa/search-engine/internal/server/http/handler"
 	"github.com/ahmadrezamusthafa/search-engine/internal/server/http/router"
 	"github.com/dgraph-io/badger/v4"
+	"github.com/dgraph-io/badger/v4/options"
 	"log"
 	"net/http"
 )
@@ -18,6 +19,11 @@ func main() {
 	}
 
 	opts := badger.DefaultOptions("./db").WithLoggingLevel(badger.INFO)
+	opts.ValueThreshold = 16
+	opts.ValueLogFileSize = 8 << 20
+	opts.NumCompactors = 4
+	opts.Compression = options.ZSTD
+
 	db, err := badger.Open(opts)
 	if err != nil {
 		log.Fatalf("Failed to init database: %v", err)
