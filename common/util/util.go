@@ -1,6 +1,7 @@
 package util
 
 import (
+	"github.com/ahmadrezamusthafa/search-engine/internal/structs"
 	"strconv"
 	"unicode"
 )
@@ -35,4 +36,15 @@ func CapitalizeFirstWord(s string) string {
 	runes[0] = unicode.ToUpper(runes[0])
 
 	return string(runes)
+}
+
+func GetTopItems(input []structs.SearchResult, maxItem int) []structs.SearchResult {
+	if len(input) == 0 {
+		return nil
+	}
+	numItems := len(input)
+	if numItems > maxItem {
+		numItems = maxItem
+	}
+	return input[:numItems]
 }

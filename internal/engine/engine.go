@@ -3,6 +3,7 @@ package engine
 import (
 	"encoding/json"
 	"errors"
+	"github.com/ahmadrezamusthafa/search-engine/common/util"
 	"github.com/ahmadrezamusthafa/search-engine/config"
 	"github.com/ahmadrezamusthafa/search-engine/internal/structs"
 	"github.com/dgraph-io/badger/v4"
@@ -17,7 +18,7 @@ type SearchEngine struct {
 	db           *badger.DB
 	docTokensLen map[string]int
 	termDocCount map[string]int
-	tokenLength  int
+	tokenLen     int
 	docCount     int
 	k1           float64
 	b            float64
@@ -33,7 +34,7 @@ func NewSearchEngine(config config.BM25Config, db *badger.DB) (*SearchEngine, er
 	}, nil
 }
 
-func (se *SearchEngine) StoreDocument(docID string, tokens []string) {
+func (se *SearchEngine) StoreDocument(docID string, tokens []string, contents ...structs.Content) {
 	se.mu.Lock()
 	defer se.mu.Unlock()
 
@@ -43,7 +44,7 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string) {
 	}
 
 	se.docTokensLen[docID] = len(tokens)
-	se.tokenLength += len(tokens)
+	se.tokenLen += len(tokens)
 	se.docCount++
 
 	for token, freq := range tokenFrequency {
@@ -81,9 +82,26 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string) {
 			return nil
 		})
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 
+	}
+
+	if len(contents) > 0 {
+		err := se.db.Update(func(txn *badger.Txn) error {
+			val, err := json.Marshal(contents[0].Object)
+			if err != nil {
+				return err
+			}
+			err = txn.Set([]byte("data:"+docID), val)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			log.Println(err)
+		}
 	}
 }
 
@@ -122,7 +140,7 @@ func (se *SearchEngine) Search(queries ...string) []structs.SearchResult {
 			return nil
 		})
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 	}
 
@@ -135,6 +153,30 @@ func (se *SearchEngine) Search(queries ...string) []structs.SearchResult {
 		return results[i].Score > results[j].Score
 	})
 
+	if len(results) > 0 {
+		results = util.GetTopItems(results, 3)
+		err := se.db.View(func(txn *badger.Txn) error {
+			for i, result := range results {
+				item, err := txn.Get([]byte("data:" + result.ID))
+				if err != nil {
+					return err
+				}
+				var value map[string]interface{}
+				err = item.Value(func(val []byte) error {
+					return json.Unmarshal(val, &value)
+				})
+				if err != nil {
+					return err
+				}
+				results[i].Data = value
+			}
+			return nil
+		})
+		if err != nil {
+			log.Println(err)
+		}
+	}
+
 	return results
 }
 
@@ -142,10 +184,14 @@ func (se *SearchEngine) calculateAvgDocLength() int {
 	if se.docCount == 0 {
 		return 0
 	}
-	return se.tokenLength / se.docCount
+	return se.tokenLen / se.docCount
 }
 
 func (se *SearchEngine) calculateBM25(tf, df, docLen, avgDocLen int, k1, b float64) float64 {
+	if df == 0 || avgDocLen == 0 {
+		return 0
+	}
+
 	idf := math.Log((float64(se.docCount)-float64(df)+0.5)/(float64(df)+0.5) + 1)
 	tfWeight := (float64(tf) * (k1 + 1)) / (float64(tf) + k1*(1-b+b*float64(docLen)/float64(avgDocLen)))
 	return idf * tfWeight
