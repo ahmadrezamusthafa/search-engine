@@ -21,6 +21,8 @@ type SearchEngine struct {
 	b        float64
 }
 
+const DefaultTTL = 2 * time.Hour
+
 func NewSearchEngine(config config.BM25Config, badgerDB *badgerdb.BadgerDB) *SearchEngine {
 	tokenLen, docCount := repopulateData(badgerDB)
 	return &SearchEngine{
@@ -62,7 +64,7 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string, contents ..
 			log.Println(err)
 		}
 		termDocCount++
-		err = se.badgerDB.SetInt("termDocCount:"+token, termDocCount, 1*time.Hour)
+		err = se.badgerDB.SetInt("termDocCount:"+token, termDocCount, DefaultTTL)
 		if err != nil {
 			log.Println(err)
 		}
@@ -75,27 +77,27 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string, contents ..
 			currentIndexData = make(map[string]int)
 		}
 		currentIndexData[docID] = freq
-		err = se.badgerDB.SetObject("index:"+token, currentIndexData, 1*time.Hour)
+		err = se.badgerDB.SetObject("index:"+token, currentIndexData, DefaultTTL)
 		if err != nil {
 			log.Println(err)
 		}
 	}
 
-	err := se.badgerDB.SetInt("docTokensLen:"+docID, len(tokens), 1*time.Hour)
+	err := se.badgerDB.SetInt("docTokensLen:"+docID, len(tokens), DefaultTTL)
 	if err != nil {
 		log.Println(err)
 	}
-	err = se.badgerDB.SetInt("tokenLen", se.tokenLen, 1*time.Hour)
+	err = se.badgerDB.SetInt("tokenLen", se.tokenLen, DefaultTTL)
 	if err != nil {
 		log.Println(err)
 	}
-	err = se.badgerDB.SetInt("docCount", se.docCount, 1*time.Hour)
+	err = se.badgerDB.SetInt("docCount", se.docCount, DefaultTTL)
 	if err != nil {
 		log.Println(err)
 	}
 
 	if len(contents) > 0 {
-		err := se.badgerDB.SetObject("data:"+docID, contents[0].Object, 1*time.Hour)
+		err := se.badgerDB.SetObject("data:"+docID, contents[0].Object, DefaultTTL)
 		if err != nil {
 			log.Println(err)
 		}
