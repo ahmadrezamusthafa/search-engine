@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/ahmadrezamusthafa/search-engine/config"
 	"github.com/ahmadrezamusthafa/search-engine/internal/engine"
-	"github.com/dgraph-io/badger/v4"
+	"github.com/ahmadrezamusthafa/search-engine/pkg/badgerdb"
 	"log"
 	"testing"
 )
@@ -22,11 +22,7 @@ func BenchmarkSearch(b *testing.B) {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	opts := badger.DefaultOptions("./db").WithLoggingLevel(badger.INFO)
-	db, err := badger.Open(opts)
-	if err != nil {
-		log.Fatalf("Failed to init database: %v", err)
-	}
+	db := badgerdb.NewBadgerDB("./db")
 	defer db.Close()
 
 	searchEngine, err := engine.NewSearchEngine(cfg.BM25, db)

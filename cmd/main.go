@@ -6,8 +6,7 @@ import (
 	"github.com/ahmadrezamusthafa/search-engine/internal/engine"
 	"github.com/ahmadrezamusthafa/search-engine/internal/server/http/handler"
 	"github.com/ahmadrezamusthafa/search-engine/internal/server/http/router"
-	"github.com/dgraph-io/badger/v4"
-	"github.com/dgraph-io/badger/v4/options"
+	"github.com/ahmadrezamusthafa/search-engine/pkg/badgerdb"
 	"log"
 	"net/http"
 )
@@ -18,16 +17,7 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	opts := badger.DefaultOptions("./db").WithLoggingLevel(badger.INFO)
-	opts.ValueThreshold = 16
-	opts.ValueLogFileSize = 8 << 20
-	opts.NumCompactors = 4
-	opts.Compression = options.ZSTD
-
-	db, err := badger.Open(opts)
-	if err != nil {
-		log.Fatalf("Failed to init database: %v", err)
-	}
+	db := badgerdb.NewBadgerDB("./db")
 	defer db.Close()
 
 	searchEngine, err := engine.NewSearchEngine(cfg.BM25, db)

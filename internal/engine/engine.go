@@ -6,6 +6,7 @@ import (
 	"github.com/ahmadrezamusthafa/search-engine/common/util"
 	"github.com/ahmadrezamusthafa/search-engine/config"
 	"github.com/ahmadrezamusthafa/search-engine/internal/structs"
+	"github.com/ahmadrezamusthafa/search-engine/pkg/badgerdb"
 	"github.com/dgraph-io/badger/v4"
 	"log"
 	"math"
@@ -15,28 +16,28 @@ import (
 
 type SearchEngine struct {
 	mu       sync.RWMutex
-	db       *badger.DB
+	badgerDB *badgerdb.BadgerDB
 	tokenLen int
 	docCount int
 	k1       float64
 	b        float64
 }
 
-func NewSearchEngine(config config.BM25Config, db *badger.DB) (*SearchEngine, error) {
-	tokenLen, docCount := repopulateData(db)
+func NewSearchEngine(config config.BM25Config, badgerDB *badgerdb.BadgerDB) (*SearchEngine, error) {
+	tokenLen, docCount := repopulateData(badgerDB)
 	return &SearchEngine{
 		tokenLen: tokenLen,
 		docCount: docCount,
-		db:       db,
+		badgerDB: badgerDB,
 		k1:       config.K1,
 		b:        config.B,
 	}, nil
 }
 
-func repopulateData(db *badger.DB) (int, int) {
+func repopulateData(badgerDB *badgerdb.BadgerDB) (int, int) {
 	var tokenLen, docCount int
 
-	err := db.View(func(txn *badger.Txn) error {
+	err := badgerDB.DB.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte("tokenLen"))
 		if err != nil {
 			return err
@@ -98,7 +99,7 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string, contents ..
 
 	for token, freq := range tokenFrequency {
 
-		err := se.db.Update(func(txn *badger.Txn) error {
+		err := se.badgerDB.DB.Update(func(txn *badger.Txn) error {
 			item, err := txn.Get([]byte("termDocCount:" + token))
 			if err != nil && !errors.Is(err, badger.ErrKeyNotFound) {
 				return err
@@ -136,7 +137,7 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string, contents ..
 			log.Println(err)
 		}
 
-		err = se.db.Update(func(txn *badger.Txn) error {
+		err = se.badgerDB.DB.Update(func(txn *badger.Txn) error {
 			item, err := txn.Get([]byte("index:" + token))
 			if err != nil && !errors.Is(err, badger.ErrKeyNotFound) {
 				return err
@@ -172,7 +173,7 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string, contents ..
 		}
 	}
 
-	err := se.db.Update(func(txn *badger.Txn) error {
+	err := se.badgerDB.DB.Update(func(txn *badger.Txn) error {
 
 		updatedData, err := json.Marshal([]int{len(tokens)})
 		if err != nil {
@@ -207,7 +208,7 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string, contents ..
 	}
 
 	if len(contents) > 0 {
-		err := se.db.Update(func(txn *badger.Txn) error {
+		err := se.badgerDB.DB.Update(func(txn *badger.Txn) error {
 			val, err := json.Marshal(contents[0].Object)
 			if err != nil {
 				return err
@@ -236,7 +237,7 @@ func (se *SearchEngine) Search(queries ...string) []structs.SearchResult {
 	docScores := make(map[string]float64)
 
 	for _, query := range queries {
-		err := se.db.View(func(txn *badger.Txn) error {
+		err := se.badgerDB.DB.View(func(txn *badger.Txn) error {
 			item, err := txn.Get([]byte("index:" + query))
 			if err != nil {
 				return err
@@ -309,7 +310,7 @@ func (se *SearchEngine) Search(queries ...string) []structs.SearchResult {
 
 	if len(results) > 0 {
 		results = util.GetTopItems(results, 3)
-		err := se.db.View(func(txn *badger.Txn) error {
+		err := se.badgerDB.DB.View(func(txn *badger.Txn) error {
 			for i, result := range results {
 				item, err := txn.Get([]byte("data:" + result.ID))
 				if err != nil {
