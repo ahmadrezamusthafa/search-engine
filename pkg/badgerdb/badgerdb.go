@@ -14,12 +14,31 @@ type BadgerDB struct {
 	DB *badger.DB
 }
 
+type KVInt struct {
+	Key   string
+	Value int
+}
+
+type KVInterface struct {
+	Key   string
+	Value int
+}
+
 func NewBadgerDB(path string) *BadgerDB {
-	opts := badger.DefaultOptions(path).WithLoggingLevel(badger.INFO)
+	opts := badger.DefaultOptions(path).WithLoggingLevel(badger.ERROR)
 	opts.ValueThreshold = 16
 	opts.ValueLogFileSize = 8 << 20
-	opts.NumCompactors = 4
+	opts.NumCompactors = 2
 	opts.Compression = options.ZSTD
+	opts.MemTableSize = 64 << 20
+	opts.BlockCacheSize = 64 << 20
+	opts.BloomFalsePositive = 0.01
+	opts.NumLevelZeroTables = 2
+	opts.NumLevelZeroTablesStall = 10
+	opts.NumMemtables = 5
+	opts.SyncWrites = false
+	opts.ValueLogMaxEntries = 1000000
+	opts.MaxLevels = 4
 
 	db, err := badger.Open(opts)
 	if err != nil {
@@ -38,6 +57,22 @@ func (b *BadgerDB) SetInt(key string, value int, ttl time.Duration) error {
 
 		entry := badger.NewEntry([]byte(key), valueBytes).WithTTL(ttl)
 		return txn.SetEntry(entry)
+	})
+}
+
+func (b *BadgerDB) SetIntegers(ttl time.Duration, kvIntegers ...KVInt) error {
+	return b.DB.Update(func(txn *badger.Txn) error {
+		for _, kvInt := range kvIntegers {
+			valueBytes := make([]byte, 8)
+			binary.BigEndian.PutUint64(valueBytes, uint64(kvInt.Value))
+
+			entry := badger.NewEntry([]byte(kvInt.Key), valueBytes).WithTTL(ttl)
+			err := txn.SetEntry(entry)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 

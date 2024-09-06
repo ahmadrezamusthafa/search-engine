@@ -83,15 +83,11 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string, contents ..
 		}
 	}
 
-	err := se.badgerDB.SetInt("docTokensLen:"+docID, len(tokens), DefaultTTL)
-	if err != nil {
-		log.Println(err)
-	}
-	err = se.badgerDB.SetInt("tokenLen", se.tokenLen, DefaultTTL)
-	if err != nil {
-		log.Println(err)
-	}
-	err = se.badgerDB.SetInt("docCount", se.docCount, DefaultTTL)
+	err := se.badgerDB.SetIntegers(DefaultTTL,
+		badgerdb.KVInt{Key: "docTokensLen:" + docID, Value: len(tokens)},
+		badgerdb.KVInt{Key: "tokenLen", Value: se.tokenLen},
+		badgerdb.KVInt{Key: "docCount", Value: se.docCount},
+	)
 	if err != nil {
 		log.Println(err)
 	}
