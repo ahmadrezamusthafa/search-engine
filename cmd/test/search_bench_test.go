@@ -4,20 +4,17 @@ import (
 	"github.com/ahmadrezamusthafa/search-engine/config"
 	"github.com/ahmadrezamusthafa/search-engine/internal/engine"
 	"github.com/ahmadrezamusthafa/search-engine/pkg/badgerdb"
+	"github.com/ahmadrezamusthafa/search-engine/pkg/redisdb"
 	"log"
 	"testing"
 )
 
 /*
 PERFORMANCE
-BenchmarkSearch-8   	   42193	     26462 ns/op
-BenchmarkSearch-8   	 2919550	       403.5 ns/op
-BenchmarkSearch-8   	 2946054	       390.2 ns/op - full using memory
-BenchmarkSearch-8   	  523896	      3724 ns/op - optimize memory usage
-BenchmarkSearch-8   	   53751	     18972 ns/op - full using badger <CURRENT>
+BenchmarkBadgerSearchEngine-8   	   95324	     14439 ns/op <CURRENT>
 */
 
-func BenchmarkSearch(b *testing.B) {
+func BenchmarkBadgerSearchEngine(b *testing.B) {
 	cfg, err := config.LoadConfig("../../config.yaml")
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
@@ -27,6 +24,34 @@ func BenchmarkSearch(b *testing.B) {
 	defer db.Close()
 
 	searchEngine := engine.NewBadgerSearchEngine(cfg.BM25, db)
+
+	searchEngine.StoreDocument("doc1", []string{"abc", "nasbdm", "aksjdhaks", "iuyiuweyri"})
+	searchEngine.StoreDocument("doc2", []string{"bvbv", "nasbdm", "aksjdhaks", "iuyiuweyri"})
+	searchEngine.StoreDocument("doc3", []string{"hgh", "nasbdm", "aksjdhaks", "iuyiuweyri"})
+	searchEngine.StoreDocument("doc3a", []string{"hgh", "nasbdm", "aksjdhaks", "iuyiuweyri"})
+	searchEngine.StoreDocument("doc3b", []string{"hgh", "nasbdm", "aksjdhaks", "iuyiuweyri"})
+	searchEngine.StoreDocument("doc3c", []string{"hgh", "nasbdm", "aksjdhaks", "iuyiuweyri"})
+	searchEngine.StoreDocument("doc4", []string{"hgh", "nasbdm", "aksjdhaks", "iuyiuweyri", "abc"})
+
+	for n := 0; n < b.N; n++ {
+		searchEngine.Search("abc")
+	}
+}
+
+/*
+PERFORMANCE
+BenchmarkRedisSearchEngine-8    	    5712	    207930 ns/op <CURRENT>
+*/
+func BenchmarkRedisSearchEngine(b *testing.B) {
+	cfg, err := config.LoadConfig("../../config.yaml")
+	if err != nil {
+		log.Fatalf("Error loading config: %v", err)
+	}
+
+	redis := redisdb.NewRedis(cfg.Redis)
+	defer redis.Close()
+
+	searchEngine := engine.NewRedisSearchEngine(cfg.BM25, redis)
 
 	searchEngine.StoreDocument("doc1", []string{"abc", "nasbdm", "aksjdhaks", "iuyiuweyri"})
 	searchEngine.StoreDocument("doc2", []string{"bvbv", "nasbdm", "aksjdhaks", "iuyiuweyri"})
