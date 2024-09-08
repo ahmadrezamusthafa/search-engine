@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/go-redis/redis/v8"
 	"log"
@@ -76,29 +77,50 @@ func (se *RedisSearchEngine) StoreDocument(docID string, tokens []string, conten
 		}
 
 		docFreqMap := make(map[string]int)
-		err = se.redisDB.HGetAll(se.ctx, "index:"+token).Scan(&docFreqMap)
+		res, err := se.redisDB.Get(se.ctx, "index:"+token).Bytes()
 		if err != nil && !errors.Is(err, redis.Nil) {
 			log.Println(err)
 		}
 
+		if res != nil {
+			err = json.Unmarshal(res, &docFreqMap)
+			if err != nil {
+				log.Println(err)
+			}
+		}
+
 		docFreqMap[docID] = freq
-		err = se.redisDB.HSet(se.ctx, "index:"+token, docFreqMap).Err()
+		docFreqMapBytes, err := json.Marshal(docFreqMap)
+		if err != nil {
+			log.Println(err)
+		}
+
+		err = se.redisDB.Set(se.ctx, "index:"+token, docFreqMapBytes, RedisTTL).Err()
 		if err != nil {
 			log.Println(err)
 		}
 	}
 
-	err := se.redisDB.MSet(se.ctx, map[string]interface{}{
-		"docTokensLen:" + docID: len(tokens),
-		"tokenLen":              se.tokenLen,
-		"docCount":              se.docCount,
-	}).Err()
+	err := se.redisDB.Set(se.ctx, "docTokensLen:"+docID, len(tokens), RedisTTL).Err()
+	if err != nil {
+		log.Println(err)
+	}
+	err = se.redisDB.Set(se.ctx, "tokenLen", se.tokenLen, RedisTTL).Err()
+	if err != nil {
+		log.Println(err)
+	}
+	err = se.redisDB.Set(se.ctx, "docCount", se.docCount, RedisTTL).Err()
 	if err != nil {
 		log.Println(err)
 	}
 
 	if len(contents) > 0 {
-		err := se.redisDB.Set(se.ctx, "data:"+docID, contents[0].Object, RedisTTL).Err()
+		contentBytes, err := json.Marshal(contents[0].Object)
+		if err != nil {
+			log.Println(err)
+		}
+
+		err = se.redisDB.Set(se.ctx, "data:"+docID, contentBytes, RedisTTL).Err()
 		if err != nil {
 			log.Println(err)
 		}
@@ -118,10 +140,17 @@ func (se *RedisSearchEngine) Search(queries ...string) []structs.SearchResult {
 
 	for _, query := range queries {
 		docFreqMap := make(map[string]int)
-		err := se.redisDB.HGetAll(se.ctx, "index:"+query).Scan(&docFreqMap)
+		res, err := se.redisDB.Get(se.ctx, "index:"+query).Bytes()
 		if err != nil && !errors.Is(err, redis.Nil) {
 			log.Println(err)
 			return nil
+		}
+
+		if res != nil {
+			err = json.Unmarshal(res, &docFreqMap)
+			if err != nil {
+				log.Println(err)
+			}
 		}
 
 		if len(docFreqMap) == 0 {
@@ -157,10 +186,17 @@ func (se *RedisSearchEngine) Search(queries ...string) []structs.SearchResult {
 		results = util.GetTopItems(results, 3)
 		for i, result := range results {
 			var value map[string]interface{}
-			err := se.redisDB.Get(se.ctx, "data:"+result.ID).Scan(&value)
+			res, err := se.redisDB.Get(se.ctx, "data:"+result.ID).Bytes()
 			if err != nil && !errors.Is(err, redis.Nil) {
 				log.Println(err)
 				continue
+			}
+
+			if res != nil {
+				err = json.Unmarshal(res, &value)
+				if err != nil {
+					log.Println(err)
+				}
 			}
 			results[i].Data = value
 		}
