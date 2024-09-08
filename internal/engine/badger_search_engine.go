@@ -93,7 +93,11 @@ func (se *BadgerSearchEngine) StoreDocument(docID string, tokens []string, conte
 	}
 
 	if len(contents) > 0 {
-		err := se.badgerDB.SetObject("data:"+docID, contents[0].Object, BadgerTTL)
+		data := map[string]interface{}{
+			"string": contents[0].String,
+			"object": contents[0].Object,
+		}
+		err := se.badgerDB.SetObject("data:"+docID, data, BadgerTTL)
 		if err != nil {
 			log.Println(err)
 		}

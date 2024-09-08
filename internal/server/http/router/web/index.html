@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Engine</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="navbar">
+    <h1>Search Engine</h1>
+    <button onclick="openModal()">Create Index</button>
+</div>
+
+<div class="container">
+    <h1>Search Content</h1>
+
+    <div id="searchForm">
+        <div class="form-group">
+            <label for="queryStrings">Query (multiple queries, comma separated)</label>
+            <input type="text" id="queryStrings" placeholder="e.g., ahmad, reza, 500150">
+        </div>
+        <button onclick="submitSearch()">Search</button>
+    </div>
+
+    <h2>Outputs</h2>
+    <pre id="resultOutput">Outputs will appear here...</pre>
+
+    <div id="indexModal" class="modal">
+
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>Index Content</h2>
+            <div id="indexForm">
+                <div class="form-group">
+                    <label for="contentString">Content String</label>
+                    <textarea id="contentString" placeholder="Enter content string"></textarea>
+                    <span id="contentStringError" class="error-message"></span>
+                </div>
+                <div class="form-group">
+                    <label for="contentObject">Content Object (JSON format)</label>
+                    <textarea id="contentObject" placeholder='{"id": 1, "amount": 1000, ...}'></textarea>
+                    <span id="contentObjectError" class="error-message"></span>
+                </div>
+                <div class="form-group">
+                    <label for="objectIndexes">Indexes (comma separated)</label>
+                    <input type="text" id="objectIndexes" placeholder="e.g., id, sender_bank, total_amount">
+                    <span id="objectIndexesError" class="error-message"></span>
+                </div>
+                <div class="form-group">
+                    <label for="stopWords">Stop Words (comma separated)</label>
+                    <input type="text" id="stopWords" placeholder="e.g., api, dari">
+                    <span id="stopWordsError" class="error-message"></span>
+                </div>
+
+                <button onclick="submitIndex()">Submit Index</button>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<script src="scripts.js"></script>
+</body>
+</html>

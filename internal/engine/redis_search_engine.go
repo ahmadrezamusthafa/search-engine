@@ -115,7 +115,11 @@ func (se *RedisSearchEngine) StoreDocument(docID string, tokens []string, conten
 	}
 
 	if len(contents) > 0 {
-		contentBytes, err := json.Marshal(contents[0].Object)
+		data := map[string]interface{}{
+			"string": contents[0].String,
+			"object": contents[0].Object,
+		}
+		contentBytes, err := json.Marshal(data)
 		if err != nil {
 			log.Println(err)
 		}
