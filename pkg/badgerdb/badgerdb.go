@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"github.com/ahmadrezamusthafa/search-engine/config"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/dgraph-io/badger/v4/options"
 	"log"
@@ -24,8 +25,8 @@ type KVInterface struct {
 	Value int
 }
 
-func NewBadgerDB(path string) *BadgerDB {
-	opts := badger.DefaultOptions(path).WithLoggingLevel(badger.ERROR)
+func NewBadgerDB(cfg config.BadgerConfig) *BadgerDB {
+	opts := badger.DefaultOptions(cfg.Path).WithLoggingLevel(badger.ERROR)
 	opts.ValueThreshold = 16
 	opts.ValueLogFileSize = 8 << 20
 	opts.NumCompactors = 2

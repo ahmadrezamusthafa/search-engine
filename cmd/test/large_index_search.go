@@ -28,7 +28,7 @@ func generateDocument() []string {
 	return words
 }
 
-func generateLargeIndex(searchEngine *engine.SearchEngine, numDocs int) {
+func generateLargeIndex(searchEngine engine.ISearchEngine, numDocs int) {
 	for i := 0; i < numDocs; i++ {
 		docID := fmt.Sprintf("doc-%d", i+1)
 		tokens := generateDocument()
@@ -46,10 +46,10 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	db := badgerdb.NewBadgerDB("./db")
+	db := badgerdb.NewBadgerDB(cfg.Badger)
 	defer db.Close()
 
-	searchEngine := engine.NewSearchEngine(cfg.BM25, db)
+	searchEngine := engine.NewBadgerSearchEngine(cfg.BM25, db)
 
 	rand.Seed(time.Now().UnixNano())
 

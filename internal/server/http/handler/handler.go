@@ -1,13 +1,15 @@
 package handler
 
-import "github.com/ahmadrezamusthafa/search-engine/internal/engine"
+import (
+	"github.com/ahmadrezamusthafa/search-engine/internal/engine"
+)
 
 type Handler struct {
-	Engine *engine.SearchEngine
+	SearchEngine engine.ISearchEngine
 }
 
-func NewHandler(searchEngine *engine.SearchEngine) *Handler {
+func NewHandler(searchEngine engine.ISearchEngine) *Handler {
 	return &Handler{
-		Engine: searchEngine,
+		SearchEngine: searchEngine,
 	}
 }

@@ -34,7 +34,7 @@ func (h *Handler) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tokens := tokenizer.Tokenize(doc.Content, doc.StopWords...)
-	h.Engine.StoreDocument(doc.ID, tokens, doc.Content)
+	h.SearchEngine.StoreDocument(doc.ID, tokens, doc.Content)
 
 	response := apiresponse.APIResponse{
 		Status:  "success",

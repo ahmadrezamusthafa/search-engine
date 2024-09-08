@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-type SearchEngine struct {
+type BadgerSearchEngine struct {
 	mu       sync.RWMutex
 	badgerDB *badgerdb.BadgerDB
 	tokenLen int
@@ -21,11 +21,11 @@ type SearchEngine struct {
 	b        float64
 }
 
-const DefaultTTL = 2 * time.Hour
+const BadgerTTL = 2 * time.Hour
 
-func NewSearchEngine(config config.BM25Config, badgerDB *badgerdb.BadgerDB) *SearchEngine {
-	tokenLen, docCount := repopulateData(badgerDB)
-	return &SearchEngine{
+func NewBadgerSearchEngine(config config.BM25Config, badgerDB *badgerdb.BadgerDB) ISearchEngine {
+	tokenLen, docCount := repopulateDataFromBadger(badgerDB)
+	return &BadgerSearchEngine{
 		tokenLen: tokenLen,
 		docCount: docCount,
 		badgerDB: badgerDB,
@@ -34,7 +34,7 @@ func NewSearchEngine(config config.BM25Config, badgerDB *badgerdb.BadgerDB) *Sea
 	}
 }
 
-func repopulateData(badgerDB *badgerdb.BadgerDB) (int, int) {
+func repopulateDataFromBadger(badgerDB *badgerdb.BadgerDB) (int, int) {
 	tokenLen, err := badgerDB.GetInt("tokenLen")
 	if err != nil {
 		return 0, 0
@@ -46,7 +46,7 @@ func repopulateData(badgerDB *badgerdb.BadgerDB) (int, int) {
 	return tokenLen, docCount
 }
 
-func (se *SearchEngine) StoreDocument(docID string, tokens []string, contents ...structs.Content) {
+func (se *BadgerSearchEngine) StoreDocument(docID string, tokens []string, contents ...structs.Content) {
 	se.mu.Lock()
 	defer se.mu.Unlock()
 
@@ -64,7 +64,7 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string, contents ..
 			log.Println(err)
 		}
 		termDocCount++
-		err = se.badgerDB.SetInt("termDocCount:"+token, termDocCount, DefaultTTL)
+		err = se.badgerDB.SetInt("termDocCount:"+token, termDocCount, BadgerTTL)
 		if err != nil {
 			log.Println(err)
 		}
@@ -77,13 +77,13 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string, contents ..
 			currentIndexData = make(map[string]int)
 		}
 		currentIndexData[docID] = freq
-		err = se.badgerDB.SetObject("index:"+token, currentIndexData, DefaultTTL)
+		err = se.badgerDB.SetObject("index:"+token, currentIndexData, BadgerTTL)
 		if err != nil {
 			log.Println(err)
 		}
 	}
 
-	err := se.badgerDB.SetIntegers(DefaultTTL,
+	err := se.badgerDB.SetIntegers(BadgerTTL,
 		badgerdb.KVInt{Key: "docTokensLen:" + docID, Value: len(tokens)},
 		badgerdb.KVInt{Key: "tokenLen", Value: se.tokenLen},
 		badgerdb.KVInt{Key: "docCount", Value: se.docCount},
@@ -93,14 +93,14 @@ func (se *SearchEngine) StoreDocument(docID string, tokens []string, contents ..
 	}
 
 	if len(contents) > 0 {
-		err := se.badgerDB.SetObject("data:"+docID, contents[0].Object, DefaultTTL)
+		err := se.badgerDB.SetObject("data:"+docID, contents[0].Object, BadgerTTL)
 		if err != nil {
 			log.Println(err)
 		}
 	}
 }
 
-func (se *SearchEngine) Search(queries ...string) []structs.SearchResult {
+func (se *BadgerSearchEngine) Search(queries ...string) []structs.SearchResult {
 	se.mu.RLock()
 	defer se.mu.RUnlock()
 
@@ -163,14 +163,18 @@ func (se *SearchEngine) Search(queries ...string) []structs.SearchResult {
 	return results
 }
 
-func (se *SearchEngine) calculateAvgDocLength() int {
+func (se *BadgerSearchEngine) GetPersistenceType() string {
+	return "BadgerDB"
+}
+
+func (se *BadgerSearchEngine) calculateAvgDocLength() int {
 	if se.docCount == 0 {
 		return 0
 	}
 	return se.tokenLen / se.docCount
 }
 
-func (se *SearchEngine) calculateBM25(tf, df, docLen, avgDocLen int, k1, b float64) float64 {
+func (se *BadgerSearchEngine) calculateBM25(tf, df, docLen, avgDocLen int, k1, b float64) float64 {
 	if df == 0 || avgDocLen == 0 {
 		return 0
 	}

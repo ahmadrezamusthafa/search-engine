@@ -25,7 +25,7 @@ func (h *Handler) SearchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results := h.Engine.Search(queries...)
+	results := h.SearchEngine.Search(queries...)
 	response := apiresponse.APIResponse{
 		Status: "success",
 		Data:   results,

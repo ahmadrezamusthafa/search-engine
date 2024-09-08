@@ -7,6 +7,7 @@ import (
 	"github.com/ahmadrezamusthafa/search-engine/internal/server/http/handler"
 	"github.com/ahmadrezamusthafa/search-engine/internal/server/http/router"
 	"github.com/ahmadrezamusthafa/search-engine/pkg/badgerdb"
+	"github.com/ahmadrezamusthafa/search-engine/pkg/redisdb"
 	"log"
 	"net/http"
 )
@@ -17,10 +18,18 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	db := badgerdb.NewBadgerDB("./db")
-	defer db.Close()
+	badgerDB := badgerdb.NewBadgerDB(cfg.Badger)
+	defer badgerDB.Close()
+	redis := redisdb.NewRedis(cfg.Redis)
+	defer redis.Close()
 
-	searchEngine := engine.NewSearchEngine(cfg.BM25, db)
+	//Sample: Redis
+	//searchEngine, err := engine.NewSearchEngine(engine.PersistenceRedis, cfg, redis)
+
+	searchEngine, err := engine.NewSearchEngine(engine.PersistenceBadger, cfg, badgerDB)
+	if err != nil {
+		log.Fatalf("Error initiate search engine: %v", err)
+	}
 
 	h := handler.NewHandler(searchEngine)
 	r := router.NewRouter(h)

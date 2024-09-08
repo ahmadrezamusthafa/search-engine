@@ -1,6 +1,23 @@
 server:
   port: "9000"
 
+badger:
+  path: "./db"
+
+redis:
+  host: "localhost"
+  port: 6381
+  db: 0
+  password:
+  dialConnTimeOut: 5s
+  readTimeOut: 10s
+  writeTimeOut: 10s
+  idleTimeOut: 60s
+  maxConnLifeTime: 5m
+  maxIdleConn: 20
+  maxActiveConn: 50
+  isWait: true
+
 bm25:
   k1: 1.5
   b: 0.5

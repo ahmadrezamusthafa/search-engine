@@ -23,10 +23,10 @@ func BenchmarkSearch(b *testing.B) {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	db := badgerdb.NewBadgerDB("./db")
+	db := badgerdb.NewBadgerDB(cfg.Badger)
 	defer db.Close()
 
-	searchEngine := engine.NewSearchEngine(cfg.BM25, db)
+	searchEngine := engine.NewBadgerSearchEngine(cfg.BM25, db)
 
 	searchEngine.StoreDocument("doc1", []string{"abc", "nasbdm", "aksjdhaks", "iuyiuweyri"})
 	searchEngine.StoreDocument("doc2", []string{"bvbv", "nasbdm", "aksjdhaks", "iuyiuweyri"})
